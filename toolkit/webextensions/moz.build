@@ -4,6 +4,12 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+DIRS += ['schemas']
+
+EXTRA_COMPONENTS += [
+    'extensions-toolkit.manifest',
+]
+
 EXTRA_JS_MODULES += [
     'Extension.jsm',
     'ExtensionAPI.jsm',
@@ -17,25 +23,15 @@ EXTRA_JS_MODULES += [
     'LegacyExtensionsUtils.jsm',
     'MessageChannel.jsm',
     'NativeMessaging.jsm',
+    'MatchPattern.jsm',
     'Schemas.jsm',
+    'WebNavigation.jsm',
+    'WebNavigationContent.js',
+    'WebNavigationFrames.jsm',
+    'WebRequest.jsm',
+    'WebRequestCommon.jsm',
+    'WebRequestContent.js',
+    'WebRequestUpload.jsm',
 ]
-
-EXTRA_COMPONENTS += [
-    'extensions-toolkit.manifest',
-]
-
-TESTING_JS_MODULES += [
-    'ExtensionTestCommon.jsm',
-    'ExtensionXPCShellUtils.jsm',
-]
-
-DIRS += ['schemas']
 
 JAR_MANIFESTS += ['jar.mn']
-
-MOCHITEST_MANIFESTS += ['test/mochitest/mochitest.ini']
-MOCHITEST_CHROME_MANIFESTS += ['test/mochitest/chrome.ini']
-XPCSHELL_TESTS_MANIFESTS += [
-    'test/xpcshell/native_messaging.ini',
-    'test/xpcshell/xpcshell.ini',
-]

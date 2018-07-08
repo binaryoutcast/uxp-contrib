@@ -23,6 +23,7 @@ if CONFIG['MOZ_JETPACK']:
     DIRS += ['jetpack']
 
 if CONFIG['MOZ_WEBEXTENSIONS']:
+    DIRS += ['webextensions']
     DIRS += ['mozapps/webextensions']
 else:
     DIRS += ['mozapps/extensions']
