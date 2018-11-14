@@ -692,6 +692,21 @@ FeedWriter.prototype = {
   },
 
   /**
+   * Get moz-icon url for a file
+   * @param   file
+   *          A nsIFile object for which the moz-icon:// is returned
+   * @returns moz-icon url of the given file as a string
+   */
+  _getFileIconURL: function FW__getFileIconURL(file) {
+    var ios = Cc["@mozilla.org/network/io-service;1"].
+              getService(Ci.nsIIOService);
+    var fph = ios.getProtocolHandler("file")
+                 .QueryInterface(Ci.nsIFileProtocolHandler);
+    var urlSpec = fph.getURLSpecFromFile(file);
+    return "moz-icon://" + urlSpec + "?size=16";
+  },
+
+  /**
    * Helper method to set the selected application and system default
    * reader menuitems details from a file object
    *   @param aMenuItem
@@ -702,7 +717,9 @@ FeedWriter.prototype = {
   _initMenuItemWithFile: function(aMenuItem, aFile) {
     this._contentSandbox.menuitem = aMenuItem;
     this._contentSandbox.label = this._getFileDisplayName(aFile);
-    var codeStr = "menuitem.setAttribute('label', label); "
+    this._contentSandbox.image = this._getFileIconURL(aFile);
+    var codeStr = "menuitem.setAttribute('label', label); " +
+                  "menuitem.setAttribute('image', image);"
     Cu.evalInSandbox(codeStr, this._contentSandbox);
   },
 
@@ -961,7 +978,7 @@ FeedWriter.prototype = {
     var menuItem = liveBookmarksMenuItem.cloneNode(false);
     menuItem.removeAttribute("selected");
     menuItem.setAttribute("anonid", "selectedAppMenuItem");
-    menuItem.className = "selectedAppMenuItem";
+    menuItem.className = "menuitem-iconic selectedAppMenuItem";
     menuItem.setAttribute("handlerType", "client");
     try {
       var prefs = Cc["@mozilla.org/preferences-service;1"].
@@ -993,7 +1010,7 @@ FeedWriter.prototype = {
       menuItem = liveBookmarksMenuItem.cloneNode(false);
       menuItem.removeAttribute("selected");
       menuItem.setAttribute("anonid", "defaultHandlerMenuItem");
-      menuItem.className = "defaultHandlerMenuItem";
+      menuItem.className = "menuitem-iconic defaultHandlerMenuItem";
       menuItem.setAttribute("handlerType", "client");
 
       this._initMenuItemWithFile(menuItem, this._defaultSystemReader);
@@ -1015,7 +1032,7 @@ FeedWriter.prototype = {
     menuItem = liveBookmarksMenuItem.cloneNode(false);
     menuItem.removeAttribute("selected");
     menuItem.setAttribute("anonid", "chooseApplicationMenuItem");
-    menuItem.className = "chooseApplicationMenuItem";
+    menuItem.className = "menuitem-iconic chooseApplicationMenuItem";
     menuItem.setAttribute("label", this._getString("chooseApplicationMenuItem"));
 
     this._contentSandbox.chooseAppMenuItem = menuItem;
@@ -1040,12 +1057,15 @@ FeedWriter.prototype = {
         }
         menuItem = liveBookmarksMenuItem.cloneNode(false);
         menuItem.removeAttribute("selected");
+        menuItem.className = "menuitem-iconic";
         menuItem.setAttribute("label", handlers[i].name);
         menuItem.setAttribute("handlerType", "web");
         menuItem.setAttribute("webhandlerurl", handlers[i].uri);
         this._contentSandbox.menuItem = menuItem;
         codeStr = "handlersMenuPopup.appendChild(menuItem);";
         Cu.evalInSandbox(codeStr, this._contentSandbox);
+
+        this._setFaviconForWebReader(handlers[i].uri, menuItem);
       }
       this._contentSandbox.menuItem = null;
     }
@@ -1346,6 +1366,51 @@ FeedWriter.prototype = {
           this._setAlwaysUseCheckedState(feedType);
       }
     } 
+  },
+
+  /**
+   * Sets the icon for the given web-reader item in the readers menu.
+   * The icon is fetched and stored through the favicon service.
+   *
+   * @param aReaderUrl
+   *        the reader url.
+   * @param aMenuItem
+   *        the reader item in the readers menulist.
+   *
+   * @note For privacy reasons we cannot set the image attribute directly
+   *       to the icon url.  See Bug 358878 for details.
+   */
+  _setFaviconForWebReader:
+  function FW__setFaviconForWebReader(aReaderUrl, aMenuItem) {
+    var readerURI = makeURI(aReaderUrl);
+    if (!/^https?$/.test(readerURI.scheme)) {
+      // Don't try to get a favicon for non http(s) URIs.
+      return;
+    }
+    var faviconURI = makeURI(readerURI.prePath + "/favicon.ico");
+    var self = this;
+    var usePrivateBrowsing = this._window.QueryInterface(Ci.nsIInterfaceRequestor)
+                                         .getInterface(Ci.nsIWebNavigation)
+                                         .QueryInterface(Ci.nsIDocShell)
+                                         .QueryInterface(Ci.nsILoadContext)
+                                         .usePrivateBrowsing;
+    var nullPrincipal = Cc["@mozilla.org/nullprincipal;1"]
+                          .createInstance(Ci.nsIPrincipal);
+    this._faviconService.setAndFetchFaviconForPage(readerURI, faviconURI, false,
+      usePrivateBrowsing ? this._faviconService.FAVICON_LOAD_PRIVATE
+                         : this._faviconService.FAVICON_LOAD_NON_PRIVATE,
+      function (aURI, aDataLen, aData, aMimeType) {
+        if (aDataLen > 0) {
+          var dataURL = "data:" + aMimeType + ";base64," +
+                        btoa(String.fromCharCode.apply(null, aData));
+          self._contentSandbox.menuItem = aMenuItem;
+          self._contentSandbox.dataURL = dataURL;
+          var codeStr = "menuItem.setAttribute('image', dataURL);";
+          Cu.evalInSandbox(codeStr, self._contentSandbox);
+          self._contentSandbox.menuItem = null;
+          self._contentSandbox.dataURL = null;
+        }
+      }, nullPrincipal);
   },
 
   classID: FEEDWRITER_CID,
